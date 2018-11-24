@@ -1,62 +1,126 @@
 # Code-Drawing 码绘VS手绘
 A comparison of Code-drawing ang Hand-drawing
 ## 绘图结果
-![image](https://github.com/zzh97228/code-draw/blob/master/tree.png)
-## "运动"主题绘图作业链接
-####    [https://github.com/zzh97228/MotionalPainting](https://github.com/zzh97228/MotionalPainting)
+![image](https://github.com/Hello-Oliver/Code-Drawing/blob/master/snow.PNG)
+## "码绘VS手绘"主题绘图作业链接
+#### [https://github.com/Hello-Oliver/Code-Drawing](https://github.com/Hello-Oliver/Code-Drawing)
 ## 技巧分析
--   递归生成子树，并变换树枝的长度和角度
+-   构造雪花片类,函数getRandomSize用于生成雪花上的随机大小
 ```ecmascript 6
-/**
- * 递归调用并画出树枝和树干
- * @param len
- * @param proportion
- */
-function branch(len,proportion) {
-    //起始线坐标及长度
-    line(0, 0, 0, -len);
-    translate(0, -len);
-    //控制最小4个分叉点
-    if (len > 4) {
-        //递归画出右子树
-        push();
-        rotate(angle);
-        //子树枝与父树枝的长度比例
-        branch(len * proportion,proportion);
-        pop();
-        //递归画出左子树
-        push();
-        rotate(-angle);
-        branch(len * proportion,proportion);
-        pop();
-    }
+float getRandomSize() {
+  
+  float r = pow(random(0, 1), 3);
+  return constrain(r * 32, 2, 32);
+  
 }
 ```
--   添加滑块可实时变更树枝的分叉角度和递归次数
+-   从图片中获取雪花图片的素材，从构造函数中可以看出（Snowflake(float sx, float sy, PImage simg)）
 ```ecmascript 6
-function draw() {
-    background(51);
-    //滑块控制展开角度
-    angle = slider.value();
-    //滑块控制树的深度
-    depth=depth_slider.value()
-    proportion=proportion_slider.value()
-    stroke(255);
-    translate(320, height);
-    branch(depth,proportion);
+  Snowflake(float sx, float sy, PImage simg) {
+    float x = sx;
+    float y = sy;
+    img = simg;
+    pos = new PVector(x, y);
+    vel = new PVector(0, 0);
+    acc = new PVector();
+    angle = random(TWO_PI);
+    dir = (random(1) > 0.5) ? 1 : -1;
+    xOff = 0;
+    r = getRandomSize();
+  }
+```
+-   给雪花添加一个合适的力，在这个程序中是有gravity提供，这个力指导雪花自由下落的总方向
+```ecmascript 6
+  void applyForce(PVector force) {
+    // Parallax Effect hack
+    PVector f = force.copy();
+    f.mult(r);
+
+    // PVector f = force.copy();
+    // f.div(mass);
+    acc.add(f);
+  }
+
+```
+-   根据每帧添加在雪花上的力（addForce函数），更新这个雪花对象的相关数据，位置，速度等
+```ecmascript 6
+
+  void update() {
+
+    xOff = sin(angle * 2) * 2 * r;
+
+    vel.add(acc);
+    vel.limit(r * 0.2);
+
+    if (vel.mag() < 1) {
+      vel.normalize();
+    }
+
+    pos.add(vel);
+    acc.mult(0);
+
+    if (pos.y > height + r) {
+      randomize();
+    }
+
+    // Wrapping Left and Right
+    if (pos.x < -r) {
+      pos.x = width + r;
+    }
+    if (pos.x > width + r) {
+      pos.x = -r;
+    }
+
+    angle += dir * vel.mag() / 200;
+
+  }
+```
+-  最后将更新过的雪花的位置画出来
+```ecmascript 6
+  void render() {
+    // stroke(255);
+    // strokeWeight(r);
+    // point(pos.x, pos.y);
+    pushMatrix();
+    translate(pos.x + xOff, pos.y);
+    rotate(angle);
+    imageMode(CENTER);
+    image(img, 0, 0, r, r);
+    popMatrix();
+
+
+  }
+}
+```
+-   在控制程序（snowfall）中，setup一开始就生成了一系列的雪花片对象，分别进行处理
+```ecmascript 6
+void setup() {
+  size(800,600);
+  spritesheet = loadImage("flakes32.png");
+  
+  snow = new ArrayList<Snowflake>();
+  textures = new ArrayList<PImage>();
+  
+  gravity = new PVector(0, 0.3);
+  for (int x = 0; x < spritesheet.width; x += 32) {
+    for (int y = 0; y < spritesheet.height; y += 32) {
+      PImage img = spritesheet.get(x, y, 32, 32);
+      image(img, x, y);
+      textures.add(img);
+    }
+  }
+  
+  for (int i = 0; i < 400; i++) {
+    float x = random(width);
+    float y = random(height);
+    int designIndex = floor(random(textures.size()));
+    PImage design = textures.get(designIndex);
+    snow.add(new Snowflake(x, y, design));
+  }
 }
 ```
 ## 对于码绘和手绘的异同分析
 -   绘图思路：
-互动媒体技术第一堂课的时候老师展示了许多分形几何的内容，而这些内容大多是用代码绘画而成的，同时我对数学方面的知识又十分感兴趣，因此决定试着用代码绘制出几何学上的分形图。
-    相同点：不管在代码编写还是手绘操作上，整个过程都需要遵循几何定律，即以固定角度岔开父节点两条树枝，这种递归实现绘图的方法。从代码的逻辑结构上从第一个节点递归，而在手绘上也同样需要从第一个下笔点画出分支，之后将下一节点作为父节点。
-    差异点：手绘的时候要考虑到整体的结构，要避免整棵树画歪，而代码绘画时则只需要考虑整体逻辑，其他API调用全靠P5.js
--   绘图技术：
-相同点：都需要自己不断尝试，得出一个最符合数学美感的分形角度。
-差异点：手绘的时候真的是感觉累死，尺规作图像是在画工程图，在实际操作中因为我要取上段树枝的2/3长度来创建下一级树枝，尺子的精度却不够，一度想放弃绘画，但是最终这种严谨的美感还是挺让人欣慰的。而在代码编写时却相对轻松，活学活用了以前数据结构的知识，递归调用二叉树的构建方法，所要做的无非就是更改树的深度已经二叉的角度。
--   创作体验：
-相同点：由于我本人对几何比较感兴趣，所以在绘图的过程中往往更能静得下心去做，不得不说，不管码绘还是手绘都是一件令人享受的过程。
-差异点：如果单从时间上来讲的画，手绘耗时太长，而且画出来的图也不尽美观，码绘调用API简单，但是创的图形规律性很强，有一种特别严谨的美感，但会少了点手工的成就感，适用于高效和工程上的作图。
- -  创作偏好：
-相同点：手绘中用线条，码绘中也同样用的是线条
-差异点：手绘用笔，码绘靠逻辑和对p5.js的熟练运用程度
+最近看了b站上有人搬运了国外大佬的一些processing教程，其中有一些内容很感兴趣，就是“自主个体”，自主个体的现象在生活中十分常见，如一堆觅食的蚂蚁，灯罩外面飞着的飞蛾，主要就是一些粒子的运动，他们的运动规律包括：可以感知的范围有限、有一定的目标、有一定的运动准则，这些粒子在可以感知的范围之内可以将准则进行实施。当然在本例当中飘飞的雪花并额米有一个目标，因为我只需要他在gravity的运动准则之下向下运动即可。
+    相同点：在代码中，雪花的下落是由addForce()来决定的，其中力的添加具有随机性，；用牙刷沾上颜料，再用尺子拨动牙刷毛，将颜料溅在纸面上，形成雪花的效果，这个过程充满趣味和随机性。所以随机性是共同点。
+    差异点：雪花在码绘之中是运动的，给人一种舒服的感觉；作画是静止的，没有办法表现出雪花运动的感觉。
